@@ -3006,6 +3006,7 @@ dependencies = [
 name = "transfer-event-custon-logs"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "near-sdk 4.0.0-pre.8",
  "near-sdk-sim",
  "serde",

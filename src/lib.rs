@@ -1,12 +1,11 @@
-mod utils;
-
 use near_sdk::{log, serde_json, AccountId, json_types::U128, serde::Serialize, serde::Deserialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use serde_json::json;
-use crate::utils::EthAddress;
 
 const STANDARD: &str = "nep297";
 const VERSION: &str = "1.0.0";
+
+pub type EthAddress = [u8; 20];
 
 #[derive(Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize)]
 pub struct Proof {
@@ -72,6 +71,15 @@ pub enum Event<'a> {
     }
 }
 
+#[allow(dead_code)]
+pub fn get_eth_address(address: String) -> EthAddress {
+    let data = hex::decode(address).expect("address should be a valid hex string.");
+    assert_eq!(data.len(), 20, "address should be 20 bytes long");
+    let mut result = [0u8; 20];
+    result.copy_from_slice(&data);
+    result
+}
+
 impl Event<'_> {
     #[allow(dead_code)]
     pub fn emit(&self) {
@@ -112,7 +120,7 @@ mod tests {
 
     fn get_eth_address() -> EthAddress {
         let address: String = "71C7656EC7ab88b098defB751B7401B5f6d8976F".to_string();
-        utils::get_eth_address(address)
+        get_eth_address(address)
     }
 
     #[test]
