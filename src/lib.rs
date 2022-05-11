@@ -27,8 +27,8 @@ pub struct TransferDataEthereum {
 #[derive(Serialize, Debug, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct TransferDataNear {
-    pub(crate) token: AccountId,
-    pub(crate) amount: U128,
+    pub token: AccountId,
+    pub amount: U128,
 }
 
 #[derive(Serialize, Debug, Clone)]
