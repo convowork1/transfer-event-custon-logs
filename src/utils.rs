@@ -1,0 +1,1 @@
+pub type EthAddress = [u8; 20];
