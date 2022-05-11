@@ -1,9 +1,11 @@
-use near_sdk::{log, serde_json, AccountId, json_types::U128, serde::Serialize, serde::Deserialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::{
+    json_types::U128, log, serde::Deserialize, serde::Serialize, serde_json, AccountId,
+};
 use serde_json::json;
 
-const STANDARD: &str = "nep297";
-const VERSION: &str = "1.0.0";
+pub const STANDARD: &str = "nep297";
+pub const VERSION: &str = "1.0.0";
 
 pub type EthAddress = [u8; 20];
 
@@ -64,11 +66,11 @@ pub enum Event<'a> {
         token: &'a AccountId,
         amount: &'a U128,
     },
-    SpectreBridgeEthProoverNotProofedEvent{
+    SpectreBridgeEthProoverNotProofedEvent {
         sender: &'a String,
         nonce: &'a U128,
-        proof: &'a Proof
-    }
+        proof: &'a Proof,
+    },
 }
 
 #[allow(dead_code)]
@@ -87,7 +89,7 @@ impl Event<'_> {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct EventMessage {
     standard: String,
@@ -104,7 +106,8 @@ pub(crate) fn emit_event<T: ?Sized + Serialize>(data: &T) {
         version: VERSION.to_string(),
         event: result["event"].clone(),
         data: [result["data"].clone()]
-    }).to_string();
+    })
+    .to_string();
     log!(format!("EVENT_JSON:{}", event_json));
 }
 
@@ -112,13 +115,12 @@ pub(crate) fn emit_event<T: ?Sized + Serialize>(data: &T) {
 mod tests {
     use super::*;
     use near_sdk::{test_utils, AccountId};
-    use crate::utils;
 
     fn alice() -> AccountId {
         AccountId::new_unchecked("alice".to_string())
     }
 
-    fn get_eth_address() -> EthAddress {
+    fn get_eth_address_test() -> EthAddress {
         let address: String = "71C7656EC7ab88b098defB751B7401B5f6d8976F".to_string();
         get_eth_address(address)
     }
@@ -128,13 +130,17 @@ mod tests {
         let nonce = &U128(238);
         let validator_id = &alice();
         let amount = U128(100);
-        let token_address = get_eth_address();
+        let token_address = get_eth_address_test();
         Event::SpectreBridgeNonceEvent {
             nonce,
             account: validator_id,
-            transfer: &TransferDataEthereum { token: token_address, amount },
+            transfer: &TransferDataEthereum {
+                token: token_address,
+                amount,
+            },
             recipient: &token_address,
-        }.emit();
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
             r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_nonce_event","data":[{"nonce":"238","account":"alice","transfer":{"token":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111],"amount":"100"},"recipient":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111]}]}"#
@@ -148,7 +154,8 @@ mod tests {
         Event::SpectreBridgeTransferFailedEvent {
             nonce,
             account: validator_id,
-        }.emit();
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
             r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_transfer_failed_event","data":[{"nonce":"238","account":"alice"}]}"#
@@ -159,15 +166,22 @@ mod tests {
     fn transfer_event_test() {
         let nonce = &U128(238);
         let validator_id = alice();
-        let token_address = get_eth_address();
+        let token_address = get_eth_address_test();
         let amount: u128 = 100;
         Event::SpectreBridgeTransferEvent {
             nonce,
             valid_till: 0,
-            transfer: &TransferDataNear { token: validator_id.clone(), amount: U128(amount) },
-            fee: &TransferDataNear { token: validator_id, amount: U128(amount) },
+            transfer: &TransferDataNear {
+                token: validator_id.clone(),
+                amount: U128(amount),
+            },
+            fee: &TransferDataNear {
+                token: validator_id,
+                amount: U128(amount),
+            },
             recipient: &token_address,
-        }.emit();
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
             r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_transfer_event","data":[{"nonce":"238","valid_till":0,"transfer":{"token":"alice","amount":"100"},"fee":{"token":"alice","amount":"100"},"recipient":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111]}]}"#
@@ -181,7 +195,8 @@ mod tests {
         Event::SpectreBridgeUnlockEvent {
             nonce,
             account: &validator_id,
-        }.emit();
+        }
+        .emit();
         assert_eq!(
             test_utils::get_logs()[0],
             r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_unlock_event","data":[{"nonce":"238","account":"alice"}]}"#
