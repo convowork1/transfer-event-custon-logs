@@ -92,8 +92,8 @@ impl Event<'_> {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct EventMessage {
-    standard: String,
-    pub version: String,
+    pub(crate) standard: String,
+    pub(crate) version: String,
     event: serde_json::Value,
     data: [serde_json::Value; 1],
 }
