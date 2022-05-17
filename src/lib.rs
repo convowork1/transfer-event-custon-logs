@@ -95,7 +95,7 @@ pub struct EventMessage {
     pub standard: String,
     pub version: String,
     pub event: serde_json::Value,
-    pub data: [serde_json::Value; 1],
+    pub data: serde_json::Value,
 }
 
 #[allow(dead_code)]
@@ -105,7 +105,7 @@ pub(crate) fn emit_event<T: ?Sized + Serialize>(data: &T) {
         standard: STANDARD.to_string(),
         version: VERSION.to_string(),
         event: result["event"].clone(),
-        data: [result["data"].clone()]
+        data: result["data"].clone(),
     })
     .to_string();
     log!(format!("EVENT_JSON:{}", event_json));
