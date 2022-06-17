@@ -9,4 +9,4 @@ env:
 
 jobs:
   call-near-workflow:
-    uses: convowork1/test-near-pipe/.github/workflows/rust.yml@main
+    uses: convowork1/test-near-pipe/.github/workflows/near.yml@main
