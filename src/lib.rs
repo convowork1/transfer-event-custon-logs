@@ -5,7 +5,6 @@ use near_sdk::{
 use serde_json::json;
 
 // Test line here
-// More
 
 pub const STANDARD: &str = "nep297";
 pub const VERSION: &str = "1.0.0";
