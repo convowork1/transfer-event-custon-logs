@@ -10,10 +10,5 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: convowork1/test-near-pipe/.github/workflows/rust.yml@mail
-    - name: Build
+  call-near-workflow:
+    uses: convowork1/test-near-pipe/.github/workflows/rust.yml@mail
