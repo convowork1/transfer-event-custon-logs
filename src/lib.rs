@@ -1,205 +1,100 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{
-    json_types::U128, log, serde::Deserialize, serde::Serialize, serde_json, AccountId,
+use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::{
+    account_info::{next_account_info, AccountInfo},
+    entrypoint,
+    entrypoint::ProgramResult,
+    msg,
+    program_error::ProgramError,
+    pubkey::Pubkey,
 };
-use serde_json::json;
 
-pub const STANDARD: &str = "nep297";
-pub const VERSION: &str = "1.0.0";
-
-pub type EthAddress = [u8; 20];
-
-#[derive(Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize)]
-pub struct Proof {
-    pub log_index: u64,
-    pub log_entry_data: Vec<u8>,
-    pub receipt_index: u64,
-    pub receipt_data: Vec<u8>,
-    pub header_data: Vec<u8>,
-    pub proof: Vec<Vec<u8>>,
+/// Define the type of state stored in accounts
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct GreetingAccount {
+    /// number of greetings
+    pub counter: u32,
 }
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(crate = "near_sdk::serde")]
-pub struct TransferDataEthereum {
-    token: EthAddress,
-    amount: U128,
-}
+// Declare and export the program's entrypoint
+entrypoint!(process_instruction);
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(crate = "near_sdk::serde")]
-pub struct TransferDataNear {
-    pub token: AccountId,
-    pub amount: U128,
-}
+// Program entrypoint's implementation
+pub fn process_instruction(
+    program_id: &Pubkey, // Public key of the account the hello world program was loaded into
+    accounts: &[AccountInfo], // The account to say hello to
+    _instruction_data: &[u8], // Ignored, all helloworld instructions are hellos
+) -> ProgramResult {
+    msg!("Hello World Rust program entrypoint");
 
-#[derive(Serialize, Debug, Clone)]
-#[serde(crate = "near_sdk::serde")]
-#[serde(tag = "event", content = "data")]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::enum_variant_names)]
-#[allow(dead_code)]
-pub enum Event<'a> {
-    SpectreBridgeNonceEvent {
-        nonce: &'a U128,
-        account: &'a AccountId,
-        transfer: &'a TransferDataEthereum,
-        recipient: &'a EthAddress,
-    },
-    SpectreBridgeTransferEvent {
-        nonce: &'a U128,
-        valid_till: u64,
-        transfer: &'a TransferDataNear,
-        fee: &'a TransferDataNear,
-        recipient: &'a EthAddress,
-    },
-    SpectreBridgeTransferFailedEvent {
-        nonce: &'a U128,
-        account: &'a AccountId,
-    },
-    SpectreBridgeUnlockEvent {
-        nonce: &'a U128,
-        account: &'a AccountId,
-    },
-    SpectreBridgeDepositEvent {
-        account: &'a AccountId,
-        token: &'a AccountId,
-        amount: &'a U128,
-    },
-    SpectreBridgeEthProoverNotProofedEvent {
-        sender: &'a String,
-        nonce: &'a U128,
-        proof: &'a Proof,
-    },
-}
+    // Iterating accounts is safer than indexing
+    let accounts_iter = &mut accounts.iter();
 
-#[allow(dead_code)]
-pub fn get_eth_address(address: String) -> EthAddress {
-    let data = hex::decode(address).expect("address should be a valid hex string.");
-    assert_eq!(data.len(), 20, "address should be 20 bytes long");
-    let mut result = [0u8; 20];
-    result.copy_from_slice(&data);
-    result
-}
+    // Get the account to say hello to
+    let account = next_account_info(accounts_iter)?;
 
-impl Event<'_> {
-    #[allow(dead_code)]
-    pub fn emit(&self) {
-        emit_event(&self);
+    // The account must be owned by the program in order to modify its data
+    if account.owner != program_id {
+        msg!("Greeted account does not have the correct program id");
+        return Err(ProgramError::IncorrectProgramId);
     }
+
+    // Increment and store the number of times the account has been greeted
+    let mut greeting_account = GreetingAccount::try_from_slice(&account.data.borrow())?;
+    greeting_account.counter += 1;
+    greeting_account.serialize(&mut &mut account.data.borrow_mut()[..])?;
+
+    msg!("Greeted {} time(s)!", greeting_account.counter);
+    // Check1
+    Ok(())
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(crate = "near_sdk::serde")]
-pub struct EventMessage {
-    pub standard: String,
-    pub version: String,
-    pub event: serde_json::Value,
-    pub data: serde_json::Value,
-}
-
-#[allow(dead_code)]
-pub(crate) fn emit_event<T: ?Sized + Serialize>(data: &T) {
-    let result = json!(data);
-    let event_json = json!(EventMessage {
-        standard: STANDARD.to_string(),
-        version: VERSION.to_string(),
-        event: result["event"].clone(),
-        data: result["data"].clone(),
-    })
-    .to_string();
-    log!(format!("EVENT_JSON:{}", event_json));
-}
-
+// Sanity tests
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
-    use near_sdk::{test_utils, AccountId};
-
-    fn alice() -> AccountId {
-        AccountId::new_unchecked("alice".to_string())
-    }
-
-    fn get_eth_address_test() -> EthAddress {
-        let address: String = "71C7656EC7ab88b098defB751B7401B5f6d8976F".to_string();
-        get_eth_address(address)
-    }
+    use solana_program::clock::Epoch;
+    use std::mem;
 
     #[test]
-    fn nonce_event_test() {
-        let nonce = &U128(238);
-        let validator_id = &alice();
-        let amount = U128(100);
-        let token_address = get_eth_address_test();
-        Event::SpectreBridgeNonceEvent {
-            nonce,
-            account: validator_id,
-            transfer: &TransferDataEthereum {
-                token: token_address,
-                amount,
-            },
-            recipient: &token_address,
-        }
-        .emit();
-        assert_eq!(
-            test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_nonce_event","data":[{"nonce":"238","account":"alice","transfer":{"token":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111],"amount":"100"},"recipient":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111]}]}"#
+    fn test_sanity() {
+        let program_id = Pubkey::default();
+        let key = Pubkey::default();
+        let mut lamports = 0;
+        let mut data = vec![0; mem::size_of::<u32>()];
+        let owner = Pubkey::default();
+        let account = AccountInfo::new(
+            &key,
+            false,
+            true,
+            &mut lamports,
+            &mut data,
+            &owner,
+            false,
+            Epoch::default(),
         );
-    }
+        let instruction_data: Vec<u8> = Vec::new();
 
-    #[test]
-    fn failed_event_test() {
-        let nonce = &U128(238);
-        let validator_id = &alice();
-        Event::SpectreBridgeTransferFailedEvent {
-            nonce,
-            account: validator_id,
-        }
-        .emit();
+        let accounts = vec![account];
+
         assert_eq!(
-            test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_transfer_failed_event","data":[{"nonce":"238","account":"alice"}]}"#
+            GreetingAccount::try_from_slice(&accounts[0].data.borrow())
+                .unwrap()
+                .counter,
+            0
         );
-    }
-
-    #[test]
-    fn transfer_event_test() {
-        let nonce = &U128(238);
-        let validator_id = alice();
-        let token_address = get_eth_address_test();
-        let amount: u128 = 100;
-        Event::SpectreBridgeTransferEvent {
-            nonce,
-            valid_till: 0,
-            transfer: &TransferDataNear {
-                token: validator_id.clone(),
-                amount: U128(amount),
-            },
-            fee: &TransferDataNear {
-                token: validator_id,
-                amount: U128(amount),
-            },
-            recipient: &token_address,
-        }
-        .emit();
+        process_instruction(&program_id, &accounts, &instruction_data).unwrap();
         assert_eq!(
-            test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_transfer_event","data":[{"nonce":"238","valid_till":0,"transfer":{"token":"alice","amount":"100"},"fee":{"token":"alice","amount":"100"},"recipient":[113,199,101,110,199,171,136,176,152,222,251,117,27,116,1,181,246,216,151,111]}]}"#
+            GreetingAccount::try_from_slice(&accounts[0].data.borrow())
+                .unwrap()
+                .counter,
+            1
         );
-    }
-
-    #[test]
-    fn unlock_event_test() {
-        let nonce = &U128(238);
-        let validator_id = alice();
-        Event::SpectreBridgeUnlockEvent {
-            nonce,
-            account: &validator_id,
-        }
-        .emit();
+        process_instruction(&program_id, &accounts, &instruction_data).unwrap();
         assert_eq!(
-            test_utils::get_logs()[0],
-            r#"EVENT_JSON:{"standard":"nep297","version":"1.0.0","event":"spectre_bridge_unlock_event","data":[{"nonce":"238","account":"alice"}]}"#
+            GreetingAccount::try_from_slice(&accounts[0].data.borrow())
+                .unwrap()
+                .counter,
+            2
         );
     }
 }
